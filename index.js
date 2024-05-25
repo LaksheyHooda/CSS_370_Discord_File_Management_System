@@ -1,11 +1,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { Client, GatewayIntentBits, Events, SlashCommandBuilder, Collection } from 'discord.js';
+import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
 import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
-
+import mongoose from 'mongoose';
 
 const client = new Client({
     intents: [
@@ -29,13 +29,48 @@ for (const folder of commandFolders) {
     for (const file of commandFiles) {
         const filePath = path.join(commandsPath, file);
         const command = await import(`./${filePath}`);
-        // Set a new item in the Collection with the key as the command name and the value as the exported module
         if ('data' in command && 'execute' in command) {
             client.commands.set(command.data.name, command);
         } else {
             console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
         }
     }
+}
+
+mongoose.connect('mongodb://localhost:27017/discord-file-manager', { useNewUrlParser: true, useUnifiedTopology: true });
+
+const fileSchema = new mongoose.Schema({
+    fileName: String,
+    uploadDate: Date,
+    tags: [String],
+    uploader: String,
+    permissions: [String],
+    type: { type: String, enum: ['file', 'folder'], default: 'file' },
+    path: { type: String, default: '' } // The path where the file/folder is located
+});
+
+const File = mongoose.model('File', fileSchema);
+
+function generateASCIITree(items) {
+    const buildTree = (items, path = '') => {
+        let tree = '';
+        const folderItems = items.filter(item => item.type === 'folder' && item.path === path);
+        const fileItems = items.filter(item => item.type === 'file' && item.path === path);
+
+        folderItems.forEach(folder => {
+            const folderPath = `${path}${folder.fileName}/`;
+            tree += `${' '.repeat(path.split('/').length - 1)}|-- ${folder.fileName}/\n`;
+            tree += buildTree(items, folderPath);
+        });
+
+        fileItems.forEach(file => {
+            tree += `${' '.repeat(path.split('/').length - 1)}|-- ${file.fileName}\n`;
+        });
+
+        return tree;
+    };
+
+    return buildTree(items);
 }
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -61,29 +96,62 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.on(Events.MessageCreate, async (message) => {
-    console.log(message.content);
-    if (!message.author.bot) {
+    if (message.content.startsWith('!createfolder')) {
+        const args = message.content.split(' ');
+        const folderName = args[1];
+        const path = args[2] || ''; // Optional path argument
 
-        if (message.attachments.size > 0) {
-            message.attachments.forEach(async (attachment) => {
-                // Log each attachment URL
-                console.log(attachment.url);
-                const filename = path.basename(attachment.url);
-                const filepath = path.join('local_downloads', filename);
-
-                // Ensure the directory exists
-                fs.mkdirSync(path.dirname(filepath), { recursive: true });
-
-                // Fetch the attachment using node-fetch and save it locally
-                const response = await fetch(attachment.url);
-                const buffer = await response.buffer();
-                fs.writeFile(filepath, buffer, () =>
-                    console.log(`Downloaded and saved attachment to ${filepath}`)
-                );
-
-                message.channel.send(`Attachment received: ${attachment.url}`);
-            });
+        if (!folderName) {
+            return message.channel.send('Please provide a folder name.');
         }
+
+        const existingFolder = await File.findOne({ fileName: folderName, path, type: 'folder' });
+        if (existingFolder) {
+            return message.channel.send('A folder with that name already exists in the specified path.');
+        }
+
+        const newFolder = new File({
+            fileName: folderName,
+            type: 'folder',
+            path: path,
+            uploader: message.author.username,
+            permissions: ['admin', 'moderator']
+        });
+        await newFolder.save();
+        message.channel.send(`Folder ${folderName} created successfully at path ${path}.`);
+    }
+
+    if (message.content.startsWith('!myfiles')) {
+        const files = await File.find({});
+        const tree = generateASCIITree(files);
+        message.channel.send(`\`\`\`\n${tree}\n\`\`\``);
+    }
+
+    if (!message.author.bot && message.attachments.size > 0) {
+        message.attachments.forEach(async (attachment) => {
+            const filename = path.basename(attachment.url);
+            const filepath = path.join('local_downloads', filename);
+
+            fs.mkdirSync(path.dirname(filepath), { recursive: true });
+
+            const response = await fetch(attachment.url);
+            const buffer = await response.buffer();
+            fs.writeFile(filepath, buffer, () =>
+                console.log(`Downloaded and saved attachment to ${filepath}`)
+            );
+
+            const newFile = new File({
+                fileName: filename,
+                uploadDate: new Date(),
+                tags: [], // Tags can be added via another command
+                uploader: message.author.username,
+                permissions: ['admin', 'moderator'],
+                type: 'file',
+                path: '' // Root path
+            });
+            await newFile.save();
+            message.channel.send(`Attachment received: ${attachment.url}`);
+        });
     }
 });
 
