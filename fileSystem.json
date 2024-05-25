@@ -1,0 +1,10 @@
+{
+    "Projects": {
+        "type": "folder",
+        "children": {}
+    },
+    "Personal": {
+        "type": "folder",
+        "children": {}
+    }
+}
