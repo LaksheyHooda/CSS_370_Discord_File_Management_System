@@ -5,7 +5,8 @@ import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
-import FileManagementSystem from './FileManagementSystem.js'; // Import the FileManagementSystem
+import FileManagementSystem from './FileManagementSystem.js';
+import { searchForFileInServer } from './utils/searchForFileInServer.js'; // Import the utility function
 
 // ES module equivalents of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -63,6 +64,8 @@ async function initializeFileStructure(guild) {
             }
 
             lastMessageId = messages.last().id;
+            // Delay to avoid hitting rate limits
+            await new Promise(resolve => setTimeout(resolve, 1200));
         }
     }
 }

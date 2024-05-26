@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+import { validatePath } from '../utils/validatePath.js'; // Import the utility function
 
 export const data = new SlashCommandBuilder()
     .setName('createfile')
@@ -29,20 +30,23 @@ export async function execute(interaction, FileManagementSystem) {
         // You might need to handle this with a message collector or similar approach
     }
 
-    if (attachments.size === 1) {
-        const attachment = attachments.first();
-        const fileName = fileNameOption || attachment.name;
-        FileManagementSystem.createFile(pathOption, fileName, attachment.url);
-        return interaction.reply({ content: `File "${fileName}" created successfully at path "${pathOption}" with the attachment.`, ephemeral: true });
-    } else {
-        const folderName = fileNameOption || `NewFolder_${Date.now()}`;
-        const fullPath = pathOption ? `${pathOption}/${folderName}` : folderName;
-        FileManagementSystem.createFolder(fullPath);
+        if (attachments.size === 1) {
+            const attachment = attachments.first();
+            const fileName = fileNameOption || attachment.name;
+            FileManagementSystem.createFile(pathOption, fileName, attachment.url);
+            return interaction.reply({ content: `File "${fileName}" created successfully at path "${pathOption}" with the attachment.`, ephemeral: true });
+        } else {
+            const folderName = fileNameOption || `NewFolder_${Date.now()}`;
+            const fullPath = pathOption ? `${pathOption}/${folderName}` : folderName;
+            FileManagementSystem.createFolder(fullPath);
 
-        for (const attachment of attachments.values()) {
-            FileManagementSystem.createFile(fullPath, attachment.name, attachment.url);
+            for (const attachment of attachments.values()) {
+                FileManagementSystem.createFile(fullPath, attachment.name, attachment.url);
+            }
+
+            return interaction.reply({ content: `Folder "${folderName}" created successfully at path "${pathOption}" with attachments.`, ephemeral: true });
         }
-
-        return interaction.reply({ content: `Folder "${folderName}" created successfully at path "${pathOption}" with attachments.`, ephemeral: true });
+    } catch (error) {
+        console.error(error);
     }
 }
