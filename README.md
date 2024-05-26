@@ -1,1 +1,1 @@
-Discord File Management System for CSS 370 at UWB
+Discord File Management System for Discord servers

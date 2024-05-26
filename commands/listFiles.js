@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+import { splitMessage } from '../utils/splitMessage.js'; // Import the utility function
 
 export const data = new SlashCommandBuilder()
     .setName('listfiles')
@@ -6,11 +7,11 @@ export const data = new SlashCommandBuilder()
     .addStringOption(option =>
         option.setName('path')
             .setDescription('The path to list files from')
-            .setRequired (false))
+            .setRequired(false))
     .addBooleanOption(option =>
         option.setName('full')
             .setDescription('Show all subdirectories and their files')
-            .setRequired (false));
+            .setRequired(false));
 
 export async function execute(interaction, FileManagementSystem) {
     let pathOption = interaction.options.getString('path') || ''; // Default to an empty string
@@ -22,5 +23,11 @@ export async function execute(interaction, FileManagementSystem) {
     }
 
     const tree = FileManagementSystem.displayDirectory(FileManagementSystem.root, pathOption, 0, [0], fullOption);
-    return interaction.reply({ content: `\`\`\`\n${tree}\n\`\`\``, ephemeral: true });
+    const messages = splitMessage(`\`\`\`\n${tree}\n\`\`\``);
+
+    await interaction.reply({ content: messages[0], ephemeral: true });
+
+    for (let i = 1; i < messages.length; i++) {
+        await interaction.followUp({ content: messages[i], ephemeral: true });
+    }
 }

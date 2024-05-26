@@ -1,4 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
+import { validatePath } from '../utils/validatePath.js';
+import { searchForFileInServer } from '../utils/searchForFileInServer.js'; // Import the utility function
 
 export const data = new SlashCommandBuilder()
     .setName('replacefile')
@@ -6,19 +8,19 @@ export const data = new SlashCommandBuilder()
     .addStringOption(option =>
         option.setName('path')
             .setDescription('The path where the file is located')
-            .setRequired (true))
+            .setRequired(true))
     .addStringOption(option =>
         option.setName('oldfilename')
             .setDescription('The name of the file to be replaced')
-            .setRequired (true))
+            .setRequired(true))
     .addAttachmentOption(option =>
         option.setName('file')
             .setDescription('The new file to upload')
-            .setRequired (true))
+            .setRequired(true))
     .addStringOption(option =>
         option.setName('newfilename')
             .setDescription('The name of the new file')
-            .setRequired (false));
+            .setRequired(false));
 
 export async function execute(interaction, FileManagementSystem) {
     const oldFileName = interaction.options.getString('oldfilename');
@@ -26,35 +28,24 @@ export async function execute(interaction, FileManagementSystem) {
     const newFileName = interaction.options.getString('newfilename') || oldFileName;
     const attachment = interaction.options.getAttachment('file');
 
-    // Validate the path
-    if (!FileManagementSystem.validatePath(pathOption)) {
-        return interaction.reply({ content: `The path "${pathOption}" does not exist. Please provide a valid path.`, ephemeral: true });
+    try {
+        pathOption = await validatePath(interaction, FileManagementSystem, pathOption);
+
+        // Search for the message containing the file to be replaced
+        const messageToDelete = await searchForFileInServer(interaction.guild, oldFileName);
+
+        // If the message is found, delete it
+        if (messageToDelete) {
+            await messageToDelete.delete();
+            interaction.followUp({ content: `Message containing the file "${oldFileName}" has been deleted.`, ephemeral: true });
+        } else {
+            return interaction.reply({ content: `File "${oldFileName}" not found in the server.`, ephemeral: true });
+        }
+
+        // Adjust the file structure
+        FileManagementSystem.replaceFile(pathOption, oldFileName, newFileName, attachment.url);
+        return interaction.reply({ content: `File "${oldFileName}" replaced successfully with "${newFileName}" at path "${pathOption}".`, ephemeral: true });
+    } catch (error) {
+        console.error(error);
     }
-
-    // Search for the message containing the file to be replaced
-    const channel = interaction.channel;
-    let messageToDelete = null;
-
-    // Fetch the last 100 messages in the channel to search for the file
-    await channel.messages.fetch({ limit: 100000 }).then(messages => {
-        messages.forEach(message => {
-            message.attachments.forEach(attachment => {
-                if (attachment.name === oldFileName) {
-                    messageToDelete = message;
-                }
-            });
-        });
-    });
-
-    // If the message is found, delete it
-    if (messageToDelete) {
-        await messageToDelete.delete();
-        interaction.channel.send({ content: `Message containing the file "${oldFileName}" has been deleted.`, ephemeral: true });
-    } else {
-        return interaction.reply({ content: `File "${oldFileName}" not found in the server.`, ephemeral: true });
-    }
-
-    // Adjust the file structure
-    FileManagementSystem.replaceFile(pathOption, oldFileName, newFileName, attachment.url);
-    return interaction.reply({ content: `File "${oldFileName}" replaced successfully with "${newFileName}" at path "${pathOption}".`, ephemeral: true });
 }
