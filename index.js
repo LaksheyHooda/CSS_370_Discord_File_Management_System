@@ -32,32 +32,7 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-const dataFilePath = path.join(__dirname, 'fileSystem.json');
-
-let fileSystem;
-if (fs.existsSync(dataFilePath)) {
-    const data = fs.readFileSync(dataFilePath);
-    fileSystem = JSON.parse(data);
-} else {
-    fileSystem = {
-        Projects: {
-            type: 'folder',
-            children: {}
-        },
-        Personal: {
-            type: 'folder',
-            children: {}
-        },
-        swagtastic: {
-            type: 'folder',
-            children: {}
-        }
-    };
-}
-
-function saveFileSystem() {
-    fs.writeFileSync(dataFilePath, JSON.stringify(fileSystem, null, 2));
-}
+const fileManagementSystem = new FileManagementSystem();
 
 client.once(Events.ClientReady, readyClient => {
     console.log(`Ready! Logged in as ${readyClient.user.tag}`);
@@ -75,7 +50,7 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     try {
-        await command.execute(interaction, fileSystem, saveFileSystem);
+        await command.execute(interaction, fileManagementSystem);
     } catch (error) {
         console.error(error);
         interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
