@@ -4,7 +4,7 @@ dotenv.config();
 import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 // ES module equivalents of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -23,9 +23,17 @@ const client = new Client({
 
 client.commands = new Collection();
 
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = await import(pathToFileURL(filePath).href);
+    client.commands.set(command.data.name, command);
+}
+
 const dataFilePath = path.join(__dirname, 'fileSystem.json');
 
-// Load the file system from the JSON file
 let fileSystem;
 if (fs.existsSync(dataFilePath)) {
     const data = fs.readFileSync(dataFilePath);
@@ -39,30 +47,17 @@ if (fs.existsSync(dataFilePath)) {
         Personal: {
             type: 'folder',
             children: {}
+        },
+        swagtastic: {
+            type: 'folder',
+            children: {}
         }
     };
 }
 
-// Save the file system to the JSON file
 function saveFileSystem() {
     fs.writeFileSync(dataFilePath, JSON.stringify(fileSystem, null, 2));
 }
-
-// Function to generate ASCII tree
-function generateASCIITree(node, depth = 0) {
-    let tree = '';
-    for (const [key, value] of Object.entries(node)) {
-        if (value.type === 'folder') {
-            tree += `${' '.repeat(depth)}|-- ${key}/\n`;
-            tree += generateASCIITree(value.children, depth + 2);
-        } else {
-            tree += `${' '.repeat(depth)}|-- ${key}\n`;
-        }
-    }
-    return tree;
-}
-
-const commandCooldowns = new Map();
 
 client.once(Events.ClientReady, readyClient => {
     console.log(`Ready! Logged in as ${readyClient.user.tag}`);
@@ -71,52 +66,16 @@ client.once(Events.ClientReady, readyClient => {
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName, options, user } = interaction;
+    const { commandName } = interaction;
 
-    // Rate limiting
-    if (!commandCooldowns.has(user.id)) {
-        commandCooldowns.set(user.id, new Date().getTime());
-    } else {
-        const lastCommandTime = commandCooldowns.get(user.id);
-        const now = new Date().getTime();
-        if (now - lastCommandTime < 3000) { // 3 second cooldown
-            return interaction.reply('You are sending commands too quickly. Please wait a moment.');
-        }
-        commandCooldowns.set(user.id, now);
+    const command = client.commands.get(commandName);
+
+    if (!command) {
+        return interaction.reply({ content: 'This command is not available.', ephemeral: true });
     }
 
     try {
-        if (commandName === 'createfolder') {
-            const folderName = options.getString('foldername');
-            const pathOption = options.getString('path') || '';
-            const paths = pathOption.split('/').filter(Boolean);
-            let current = fileSystem;
-
-            for (const p of paths) {
-                if (!current[p] || current[p].type !== 'folder') {
-                    return interaction.reply(`Path "${pathOption}" does not exist.`);
-                }
-                current = current[p].children;
-            }
-
-            if (current[folderName]) {
-                return interaction.reply(`A folder with the name "${folderName}" already exists at path "${pathOption}".`);
-            }
-
-            current[folderName] = { type: 'folder', children: {} };
-            saveFileSystem();
-            interaction.reply(`Folder "${folderName}" created successfully at path "${pathOption}".`);
-        }
-
-        if (commandName === 'myfiles') {
-            const tree = generateASCIITree(fileSystem);
-            interaction.reply(`\`\`\`\n${tree}\n\`\`\``);
-        }
-
-        if (commandName === 'help') {
-            const helpMessage = commands.map(cmd => `/${cmd.name} - ${cmd.description}`).join('\n');
-            interaction.reply(`\`\`\`\n${helpMessage}\n\`\`\``);
-        }
+        await command.execute(interaction, fileSystem, saveFileSystem);
     } catch (error) {
         console.error(error);
         interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });

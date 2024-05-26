@@ -1,10 +1,20 @@
 {
-    "Projects": {
-        "type": "folder",
-        "children": {}
-    },
-    "Personal": {
-        "type": "folder",
-        "children": {}
-    }
+  "Projects": {
+    "type": "folder",
+    "children": {}
+  },
+  "Personal": {
+    "type": "folder",
+    "children": {}
+  },
+  "swagtastic": {
+    "type": "folder",
+    "children": {}
+  },
+  "giggity": {
+    "type": "file"
+  },
+  "fatty": {
+    "type": "file"
+  }
 }
