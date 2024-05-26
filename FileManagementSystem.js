@@ -70,18 +70,8 @@ export default class FileManagementSystem {
         }
     }
 
-<<<<<<< HEAD:FileManagementSystem.js
     createFile(path = '', fileName = '', fileLink = '', permissions = [0]) {
         if (!fileName) {
-=======
-    /**
-     * Create a file in the file system. 
-     * If the file already exists, do nothing. Default path is root.
-     * @param {string} path - The path to the file to be created.
-     */
-    createFile(path = '', fileName = '', fileLink = '', permissions = [0], owner = '') {
-        if (fileName === '') {
->>>>>>> f452aec490c08115bec7d076930c4a4151af501c:fileManagementSystem/fileManagementSystem.js
             console.log('Please provide a valid file.');
             return;
         }
@@ -112,18 +102,9 @@ export default class FileManagementSystem {
             }
         }
 
-<<<<<<< HEAD:FileManagementSystem.js
         const file = new FileObject(fileName, fileLink);
         file.permissions = permissions;
         current.files.push(file);
-=======
-        if (!current.files.includes(fileLink)) {
-            const file = new FileObject(fileName, fileLink);
-            file.permissions = permissions;
-            file.owner = owner;
-            current.files.push(file);
-        }
->>>>>>> f452aec490c08115bec7d076930c4a4151af501c:fileManagementSystem/fileManagementSystem.js
     }
 
     deleteFolder(path = '', permissions = [0]) {
@@ -157,20 +138,8 @@ export default class FileManagementSystem {
         }
     }
 
-<<<<<<< HEAD:FileManagementSystem.js
     deleteFile(path = '', fileName = '', permissions = [0]) {
         if (!fileName) {
-=======
-    /** 
-     * Delete a file in the file system.
-     * If the file does not exist or path does not exist
-     * print to consonle saying file does not exist. Default path is root.
-     * @param {string} path - The path to the file to be deleted.
-     * @param {string} fileName - The file to be deleted.
-     */
-    deleteFile(path = '', fileName = '', permissions = [0], requester = '') {
-        if (fileName === '') {
->>>>>>> f452aec490c08115bec7d076930c4a4151af501c:fileManagementSystem/fileManagementSystem.js
             console.log('Please provide a valid file.');
             return false;
         }

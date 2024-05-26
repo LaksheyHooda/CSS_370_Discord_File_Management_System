@@ -1,4 +1,4 @@
-import fileManagementSystem from './fileManagementSystem/fileManagementSystem.js';
+import fileManagementSystem from './FileManagementSystem.js';
 
 const main = () => {
     const fms = new fileManagementSystem();
