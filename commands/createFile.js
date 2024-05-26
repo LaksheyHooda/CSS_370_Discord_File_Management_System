@@ -21,12 +21,24 @@ export async function execute(interaction, FileManagementSystem) {
     let pathOption = interaction.options.getString('path') || ''; // Default to an empty string
     const attachments = interaction.options.getAttachment('file') ? interaction.options.getAttachment('file') : interaction.message.attachments;
 
+<<<<<<< HEAD
     // Validate the path
     while (!FileManagementSystem.validatePath(pathOption)) {
         await interaction.reply({ content: `The path "${pathOption}" does not exist. Please provide a valid path.`, ephemeral: true });
         // Wait for user response and update pathOption
         // This requires implementation for waiting and getting user response, which Discord.js does not natively support directly in slash commands
         // You might need to handle this with a message collector or similar approach
+=======
+    interaction.guild.members.fetch(interaction.user.id).then(member => {
+        console.log(member.user.id)
+    });
+
+    for (const p of paths) {
+        if (!current[p] || current[p].type !== 'folder') {
+            return interaction.reply({ content: `Path "${pathOption}" does not exist.`, ephemeral: true });
+        }
+        current = current[p].children;
+>>>>>>> f452aec490c08115bec7d076930c4a4151af501c
     }
 
     if (attachments.size === 1) {
