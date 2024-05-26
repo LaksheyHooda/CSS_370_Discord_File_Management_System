@@ -1,11 +1,14 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { Client, GatewayIntentBits, Events, SlashCommandBuilder, Collection } from 'discord.js';
-import fetch from 'node-fetch';
+import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 
+// ES module equivalents of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const client = new Client({
     intents: [
@@ -20,75 +23,63 @@ const client = new Client({
 
 client.commands = new Collection();
 
-const foldersPath = path.join('commands');
-const commandFolders = fs.readdirSync(foldersPath);
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-for (const folder of commandFolders) {
-    const commandsPath = path.join(foldersPath, folder);
-    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-    for (const file of commandFiles) {
-        const filePath = path.join(commandsPath, file);
-        const command = await import(`./${filePath}`);
-        // Set a new item in the Collection with the key as the command name and the value as the exported module
-        if ('data' in command && 'execute' in command) {
-            client.commands.set(command.data.name, command);
-        } else {
-            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
-        }
-    }
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = await import(pathToFileURL(filePath).href);
+    client.commands.set(command.data.name, command);
 }
+
+const dataFilePath = path.join(__dirname, 'fileSystem.json');
+
+let fileSystem;
+if (fs.existsSync(dataFilePath)) {
+    const data = fs.readFileSync(dataFilePath);
+    fileSystem = JSON.parse(data);
+} else {
+    fileSystem = {
+        Projects: {
+            type: 'folder',
+            children: {}
+        },
+        Personal: {
+            type: 'folder',
+            children: {}
+        },
+        swagtastic: {
+            type: 'folder',
+            children: {}
+        }
+    };
+}
+
+function saveFileSystem() {
+    fs.writeFileSync(dataFilePath, JSON.stringify(fileSystem, null, 2));
+}
+
+client.once(Events.ClientReady, readyClient => {
+    console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+});
 
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    const command = interaction.client.commands.get(interaction.commandName);
+    const { commandName } = interaction;
+
+    const command = client.commands.get(commandName);
 
     if (!command) {
-        console.error(`No command matching ${interaction.commandName} was found.`);
-        return;
+        return interaction.reply({ content: 'This command is not available.', ephemeral: true });
     }
 
     try {
-        await command.execute(interaction);
+        await command.execute(interaction, fileSystem, saveFileSystem);
     } catch (error) {
         console.error(error);
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
-        } else {
-            await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
-        }
+        interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
     }
-});
-
-client.on(Events.MessageCreate, async (message) => {
-    console.log(message.content);
-    if (!message.author.bot) {
-
-        if (message.attachments.size > 0) {
-            message.attachments.forEach(async (attachment) => {
-                // Log each attachment URL
-                console.log(attachment.url);
-                const filename = path.basename(attachment.url);
-                const filepath = path.join('local_downloads', filename);
-
-                // Ensure the directory exists
-                fs.mkdirSync(path.dirname(filepath), { recursive: true });
-
-                // Fetch the attachment using node-fetch and save it locally
-                const response = await fetch(attachment.url);
-                const buffer = await response.buffer();
-                fs.writeFile(filepath, buffer, () =>
-                    console.log(`Downloaded and saved attachment to ${filepath}`)
-                );
-
-                message.channel.send(`Attachment received: ${attachment.url}`);
-            });
-        }
-    }
-});
-
-client.once(Events.ClientReady, readyClient => {
-    console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
 
 client.login(process.env.DISCORD_TOKEN);
