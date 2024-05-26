@@ -20,27 +20,24 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction, FileManagementSystem) {
     const fileNameOption = interaction.options.getString('filename');
     let pathOption = interaction.options.getString('path') || ''; // Default to an empty string
-    const attachments = interaction.options.getAttachment('file') ? interaction.options.getAttachment('file') : interaction.message.attachments;
+    const attachment = interaction.options.getAttachment('file');
+
     try {
         // Validate the path
-        while (!FileManagementSystem.validatePath(pathOption)) {
-            await interaction.reply({ content: `The path "${pathOption}" does not exist. Please provide a valid path.`, ephemeral: true });
-            // Wait for user response and update pathOption
-            // This requires implementation for waiting and getting user response, which Discord.js does not natively support directly in slash commands
-            // You might need to handle this with a message collector or similar approach
-        }
+        pathOption = await validatePath(interaction, FileManagementSystem, pathOption);
 
-        if (attachments.size === 1) {
-            const attachment = attachments.first();
+        // Handle single attachment
+        if (attachment) {
             const fileName = fileNameOption || attachment.name;
             FileManagementSystem.createFile(pathOption, fileName, attachment.url);
             return interaction.reply({ content: `File "${fileName}" created successfully at path "${pathOption}" with the attachment.`, ephemeral: true });
         } else {
+            // Handle multiple attachments (if applicable in the context)
             const folderName = fileNameOption || `NewFolder_${Date.now()}`;
             const fullPath = pathOption ? `${pathOption}/${folderName}` : folderName;
             FileManagementSystem.createFolder(fullPath);
 
-            for (const attachment of attachments.values()) {
+            for (const attachment of interaction.message.attachments.values()) {
                 FileManagementSystem.createFile(fullPath, attachment.name, attachment.url);
             }
 
@@ -48,5 +45,6 @@ export async function execute(interaction, FileManagementSystem) {
         }
     } catch (error) {
         console.error(error);
+        interaction.reply({ content: 'An error occurred while creating the file.', ephemeral: true });
     }
 }
