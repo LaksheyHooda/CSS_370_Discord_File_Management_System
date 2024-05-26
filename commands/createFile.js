@@ -23,6 +23,10 @@ export async function execute(interaction, fileSystem, saveFileSystem) {
     const paths = pathOption.split('/').filter(Boolean);
     let current = fileSystem;
 
+    interaction.guild.members.fetch(interaction.user.id).then(member => {
+        console.log(member.user.id)
+    });
+
     for (const p of paths) {
         if (!current[p] || current[p].type !== 'folder') {
             return interaction.reply({ content: `Path "${pathOption}" does not exist.`, ephemeral: true });

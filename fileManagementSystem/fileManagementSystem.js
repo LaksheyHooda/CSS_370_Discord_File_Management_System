@@ -60,7 +60,7 @@ export default class FileManagementSystem {
      * If the file already exists, do nothing. Default path is root.
      * @param {string} path - The path to the file to be created.
      */
-    createFile(path = '', fileName = '', fileLink = '', permissions = [0]) {
+    createFile(path = '', fileName = '', fileLink = '', permissions = [0], owner = '') {
         if (fileName === '') {
             console.log('Please provide a valid file.');
             return;
@@ -88,6 +88,7 @@ export default class FileManagementSystem {
         if (!current.files.includes(fileLink)) {
             const file = new FileObject(fileName, fileLink);
             file.permissions = permissions;
+            file.owner = owner;
             current.files.push(file);
         }
     }
@@ -129,7 +130,7 @@ export default class FileManagementSystem {
      * @param {string} path - The path to the file to be deleted.
      * @param {string} fileName - The file to be deleted.
      */
-    deleteFile(path = '', fileName = '', permissions = [0]) {
+    deleteFile(path = '', fileName = '', permissions = [0], requester = '') {
         if (fileName === '') {
             console.log('Please provide a valid file.');
             return false;
@@ -160,7 +161,9 @@ export default class FileManagementSystem {
             if (file.name === fileName) {
                 fileExists = true;
                 if (file.permissions.some(permission => permissions.includes(permission))) {
-                    permitted = true;
+                    if (file.owner === requester || permissions.includes(1)) {
+                        permitted = true;
+                    }
                 }
                 break;
             }
