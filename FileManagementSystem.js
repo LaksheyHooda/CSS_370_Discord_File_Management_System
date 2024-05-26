@@ -169,7 +169,9 @@ export default class FileManagementSystem {
             if (file.name === fileName) {
                 fileExists = true;
                 if (file.permissions.some(permission => permissions.includes(permission))) {
-                    permitted = true;
+                    if (file.owner === requester || permissions.includes(1)) {
+                        permitted = true;
+                    }
                 }
                 break;
             }
