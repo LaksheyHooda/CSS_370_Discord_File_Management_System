@@ -1,19 +1,19 @@
 import { SlashCommandBuilder } from 'discord.js';
 
 export const data = new SlashCommandBuilder()
-    .setName('createfolder')
-    .setDescription('Create a new folder with attachments if provided')
+    .setName('deletefile')
+    .setDescription('Delete a file from a specified path')
     .addStringOption(option =>
-        option.setName('foldername')
-            .setDescription('The name of the folder to create')
+        option.setName('filename')
+            .setDescription('The name of the file to delete')
             .setRequired(true))
     .addStringOption(option =>
         option.setName('path')
-            .setDescription('The path where the folder should be created')
+            .setDescription('The path where the file is located')
             .setRequired(false));
 
 export async function execute(interaction, FileManagementSystem) {
-    const folderName = interaction.options.getString('foldername');
+    const fileName = interaction.options.getString('filename');
     let pathOption = interaction.options.getString('path') || ''; // Default to an empty string
 
     // Validate the path
@@ -24,14 +24,6 @@ export async function execute(interaction, FileManagementSystem) {
         // You might need to handle this with a message collector or similar approach
     }
 
-    const fullPath = pathOption ? `${pathOption}/${folderName}` : folderName;
-    FileManagementSystem.createFolder(fullPath);
-
-    if (attachments.size > 0) {
-        for (const attachment of attachments.values()) {
-            FileManagementSystem.createFile(fullPath, attachment.name, attachment.url);
-        }
-    }
-
-    return interaction.reply({ content: `Folder "${folderName}" created successfully at path "${pathOption}" with attachments.`, ephemeral: true });
+    FileManagementSystem.deleteFile(pathOption, fileName);
+    return interaction.reply({ content: `File "${fileName}" deleted successfully from path "${pathOption}".`, ephemeral: true });
 }

@@ -6,39 +6,37 @@ export const data = new SlashCommandBuilder()
     .addStringOption(option =>
         option.setName('sourcepath')
             .setDescription('The current path of the file')
-            .setRequired(true))
+            .setRequired (true))
     .addStringOption(option =>
         option.setName('destinationpath')
             .setDescription('The new path for the file')
-            .setRequired(true));
+            .setRequired (true))
+    .addStringOption(option =>
+        option.setName('filename')
+            .setDescription('The name of the file to move')
+            .setRequired (true));
 
-export async function execute(interaction, fileSystem, saveFileSystem) {
-    const sourcePath = interaction.options.getString('sourcepath').split('/').filter(Boolean);
-    const destinationPath = interaction.options.getString('destinationpath').split('/').filter(Boolean);
-    const fileName = sourcePath.pop();
-    let currentSource = fileSystem;
-    let currentDestination = fileSystem;
+export async function execute(interaction, FileManagementSystem) {
+    const sourcePath = interaction.options.getString('sourcepath');
+    const destinationPath = interaction.options.getString('destinationpath');
+    const fileName = interaction.options.getString('filename');
 
-    for (const p of sourcePath) {
-        if (!currentSource[p] || currentSource[p].type !== 'folder') {
-            return interaction.reply({ content: `Source path "${sourcePath.join('/')}" does not exist.`, ephemeral: true });
-        }
-        currentSource = currentSource[p].children;
+    // Validate the source path
+    while (!FileManagementSystem.validatePath(sourcePath)) {
+        await interaction.reply({ content: `The source path "${sourcePath}" does not exist. Please provide a valid path.`, ephemeral: true });
+        // Wait for user response and update sourcePath
+        // This requires implementation for waiting and getting user response, which Discord.js does not natively support directly in slash commands
+        // You might need to handle this with a message collector or similar approach
     }
 
-    if (!currentSource[fileName]) {
-        return interaction.reply({ content: `File "${fileName}" does not exist at source path "${sourcePath.join('/')}".`, ephemeral: true });
+    // Validate the destination path
+    while (!FileManagementSystem.validatePath(destinationPath)) {
+        await interaction.reply({ content: `The destination path "${destinationPath}" does not exist. Please provide a valid path.`, ephemeral: true });
+        // Wait for user response and update destinationPath
+        // This requires implementation for waiting and getting user response, which Discord.js does not natively support directly in slash commands
+        // You might need to handle this with a message collector or similar approach
     }
 
-    for (const p of destinationPath) {
-        if (!currentDestination[p] || currentDestination[p].type !== 'folder') {
-            return interaction.reply({ content: `Destination path "${destinationPath.join('/')}" does not exist.`, ephemeral: true });
-        }
-        currentDestination = currentDestination[p].children;
-    }
-
-    currentDestination[fileName] = currentSource[fileName];
-    delete currentSource[fileName];
-    saveFileSystem();
-    return interaction.reply({ content: `File "${fileName}" moved successfully to "${destinationPath.join('/')}".`, ephemeral: true });
+    FileManagementSystem.moveFile(sourcePath, destinationPath, fileName);
+    return interaction.reply({ content: `File "${fileName}" moved successfully from "${sourcePath}" to "${destinationPath}".`, ephemeral: true });
 }

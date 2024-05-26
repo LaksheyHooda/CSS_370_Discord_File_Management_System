@@ -16,45 +16,33 @@ export const data = new SlashCommandBuilder()
             .setDescription('The path where the file should be created')
             .setRequired(false));
 
-export async function execute(interaction, fileSystem, saveFileSystem) {
+export async function execute(interaction, FileManagementSystem) {
     const fileNameOption = interaction.options.getString('filename');
-    const pathOption = interaction.options.getString('path') || '';
+    let pathOption = interaction.options.getString('path') || ''; // Default to an empty string
     const attachments = interaction.options.getAttachment('file') ? interaction.options.getAttachment('file') : interaction.message.attachments;
-    const paths = pathOption.split('/').filter(Boolean);
-    let current = fileSystem;
 
-    for (const p of paths) {
-        if (!current[p] || current[p].type !== 'folder') {
-            return interaction.reply({ content: `Path "${pathOption}" does not exist.`, ephemeral: true });
-        }
-        current = current[p].children;
+    // Validate the path
+    while (!FileManagementSystem.validatePath(pathOption)) {
+        await interaction.reply({ content: `The path "${pathOption}" does not exist. Please provide a valid path.`, ephemeral: true });
+        // Wait for user response and update pathOption
+        // This requires implementation for waiting and getting user response, which Discord.js does not natively support directly in slash commands
+        // You might need to handle this with a message collector or similar approach
     }
 
     if (attachments.size === 1) {
         const attachment = attachments.first();
         const fileName = fileNameOption || attachment.name;
-
-        if (current[fileName]) {
-            return interaction.reply({ content: `A file with the name "${fileName}" already exists at path "${pathOption}".`, ephemeral: true });
-        }
-
-        current[fileName] = { type: 'file', url: attachment.url };
-        saveFileSystem();
+        FileManagementSystem.createFile(pathOption, fileName, attachment.url);
         return interaction.reply({ content: `File "${fileName}" created successfully at path "${pathOption}" with the attachment.`, ephemeral: true });
     } else {
         const folderName = fileNameOption || `NewFolder_${Date.now()}`;
-        if (current[folderName]) {
-            return interaction.reply({ content: `A folder with the name "${folderName}" already exists at path "${pathOption}".`, ephemeral: true });
-        }
-
-        current[folderName] = { type: 'folder', children: {} };
-        const newFolder = current[folderName].children;
+        const fullPath = pathOption ? `${pathOption}/${folderName}` : folderName;
+        FileManagementSystem.createFolder(fullPath);
 
         for (const attachment of attachments.values()) {
-            newFolder[attachment.name] = { type: 'file', url: attachment.url };
+            FileManagementSystem.createFile(fullPath, attachment.name, attachment.url);
         }
 
-        saveFileSystem();
         return interaction.reply({ content: `Folder "${folderName}" created successfully at path "${pathOption}" with attachments.`, ephemeral: true });
     }
 }
