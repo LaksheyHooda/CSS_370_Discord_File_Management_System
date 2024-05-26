@@ -16,37 +16,23 @@ export const data = new SlashCommandBuilder()
             .setDescription('The path for the duplicate folder')
             .setRequired(false));
 
-export async function execute(interaction, fileSystem, saveFileSystem) {
-    const sourcePath = interaction.options.getString('sourcepath').split('/').filter(Boolean);
-    const destinationPath = (interaction.options.getString('destinationpath') || '').split('/').filter(Boolean);
+export async function execute(interaction, FileManagementSystem) {
+    const sourcePath = interaction.options.getString('sourcepath');
+    const destinationPath = interaction.options.getString('destinationpath') || '';
     const newFolderName = interaction.options.getString('newfoldername');
-    const folderName = sourcePath.pop();
-    let currentSource = fileSystem;
-    let currentDestination = fileSystem;
 
-    for (const p of sourcePath) {
-        if (!currentSource[p] || currentSource[p].type !== 'folder') {
-            return interaction.reply({ content: `Source path "${sourcePath.join('/')}" does not exist.`, ephemeral: true });
+    const folderNode = FileManagementSystem.getDirectoryNode(sourcePath.split('/').pop());
+
+    if (folderNode) {
+        FileManagementSystem.createFolder(`${destinationPath}/${newFolderName}`);
+        for (const child of folderNode.children) {
+            FileManagementSystem.createFolder(`${destinationPath}/${newFolderName}/${child.name}`);
+            for (const file of child.files) {
+                FileManagementSystem.createFile(`${destinationPath}/${newFolderName}/${child.name}`, file.name, file.link);
+            }
         }
-        currentSource = currentSource[p].children;
+        return interaction.reply({ content: `Folder "${sourcePath}" duplicated successfully as "${newFolderName}" at "${destinationPath}".`, ephemeral: true });
+    } else {
+        return interaction.reply({ content: `Folder "${sourcePath}" not found.`, ephemeral: true });
     }
-
-    if (!currentSource[folderName] || currentSource[folderName].type !== 'folder') {
-        return interaction.reply({ content: `Folder "${folderName}" does not exist at source path "${sourcePath.join('/')}".`, ephemeral: true });
-    }
-
-    for (const p of destinationPath) {
-        if (!currentDestination[p] || currentDestination[p].type !== 'folder') {
-            return interaction.reply({ content: `Destination path "${destinationPath.join('/')}" does not exist.`, ephemeral: true });
-        }
-        currentDestination = currentDestination[p].children;
-    }
-
-    if (currentDestination[newFolderName]) {
-        return interaction.reply({ content: `A folder with the name "${newFolderName}" already exists at destination path "${destinationPath.join('/')}".`, ephemeral: true });
-    }
-
-    currentDestination[newFolderName] = { ...currentSource[folderName] };
-    saveFileSystem();
-    return interaction.reply({ content: `Folder "${folderName}" duplicated successfully as "${newFolderName}" at "${destinationPath.join('/')}".`, ephemeral: true });
 }

@@ -8,12 +8,11 @@ export const data = new SlashCommandBuilder()
             .setDescription('The new file structure in JSON format')
             .setRequired(true));
 
-export async function execute(interaction, fileSystem, saveFileSystem) {
+export async function execute(interaction, FileManagementSystem) {
     const jsonString = interaction.options.getString('json');
     try {
         const newFileSystem = JSON.parse(jsonString);
-        Object.assign(fileSystem, newFileSystem);
-        saveFileSystem();
+        FileManagementSystem.root = newFileSystem;
         return interaction.reply({ content: 'File structure updated successfully.', ephemeral: true });
     } catch (error) {
         return interaction.reply({ content: 'Invalid JSON format.', ephemeral: true });

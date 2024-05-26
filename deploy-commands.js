@@ -26,18 +26,75 @@ for (const file of commandFiles) {
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
-(async () => {
+async function deleteExistingCommands() {
     try {
-        console.log(`Started refreshing ${commands.length} application (/) commands.`);
+        console.log('Started deleting all application (/) commands.');
 
-        // Deploying commands to a specific guild
-        const data = await rest.put(
-            Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-            { body: commands },
+        // Retrieve all existing commands
+        const existingCommands = await rest.get(
+            Routes.applicationCommands(process.env.CLIENT_ID)
         );
 
-        console.log(`Successfully reloaded ${data.length} application (/) commands in guild ${process.env.GUILD_ID}.`);
+        const deletePromises = existingCommands.map(command => {
+            console.log(`Deleting command: ${command.name}`);
+            return rest.delete(
+                Routes.applicationCommand(process.env.CLIENT_ID, command.id)
+            );
+        });
+
+        await Promise.all(deletePromises);
+        console.log('Successfully deleted all application (/) commands.');
+
+        // If using guild-specific commands, delete them as well
+        if (process.env.GUILD_ID) {
+            console.log('Started deleting all guild (/) commands.');
+
+            const existingGuildCommands = await rest.get(
+                Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
+            );
+
+            const deleteGuildPromises = existingGuildCommands.map(command => {
+                console.log(`Deleting guild command: ${command.name}`);
+                return rest.delete(
+                    Routes.applicationGuildCommand(process.env.CLIENT_ID, process.env.GUILD_ID, command.id)
+                );
+            });
+
+            await Promise.all(deleteGuildPromises);
+            console.log('Successfully deleted all guild (/) commands.');
+        }
     } catch (error) {
-        console.error(error);
+        console.error('Error deleting commands:', error);
     }
-})();
+}
+
+async function deployCommands() {
+    try {
+        // Delete existing commands
+        await deleteExistingCommands();
+
+        // Deploy new commands in a single batch
+        console.log(`Started refreshing ${commands.length} application (/) commands.`);
+        const data = await rest.put(
+            Routes.applicationCommands(process.env.CLIENT_ID),
+            { body: commands },
+        );
+        console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+
+        // If using guild-specific commands, deploy them as well in a single batch
+        if (process.env.GUILD_ID) {
+            console.log(`Started refreshing ${commands.length} guild (/) commands.`);
+            const guildData = await rest.put(
+                Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+                { body: commands },
+            );
+            console.log(`Successfully reloaded ${guildData.length} guild (/) commands.`);
+        }
+
+        console.log('Successfully reloaded all application (/) and guild (/) commands.');
+    } catch (error) {
+        console.error('Error during deployment:', error);
+    }
+}
+
+deployCommands();

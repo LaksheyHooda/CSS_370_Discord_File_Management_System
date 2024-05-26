@@ -1,10 +1,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
+import FileManagementSystem from './FileManagementSystem.js'; // Import the FileManagementSystem
 
 // ES module equivalents of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -15,8 +16,8 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.DirectMessages,
         GatewayIntentBits.MessageContent,
+        GatewayIntentBits.DirectMessages,
     ],
     partials: ['MESSAGE', 'CHANNEL', 'REACTION'],
 });
@@ -32,53 +33,92 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-const dataFilePath = path.join(__dirname, 'fileSystem.json');
+const fileManagementSystem = new FileManagementSystem();
 
-let fileSystem;
-if (fs.existsSync(dataFilePath)) {
-    const data = fs.readFileSync(dataFilePath);
-    fileSystem = JSON.parse(data);
-} else {
-    fileSystem = {
-        Projects: {
-            type: 'folder',
-            children: {}
-        },
-        Personal: {
-            type: 'folder',
-            children: {}
-        },
-        swagtastic: {
-            type: 'folder',
-            children: {}
+async function initializeFileStructure(guild) {
+    const channels = guild.channels.cache.filter(channel => channel.isTextBased());
+
+    for (const [channelId, channel] of channels) {
+        let lastMessageId;
+        while (true) {
+            const options = { limit: 100 };
+            if (lastMessageId) {
+                options.before = lastMessageId;
+            }
+
+            const messages = await channel.messages.fetch(options);
+            if (messages.size === 0) {
+                break;
+            }
+
+            for (const message of messages.values()) {
+                if (message.attachments.size > 0) {
+                    message.attachments.forEach(attachment => {
+                        const fileName = attachment.name;
+                        const fileUrl = attachment.url;
+                        const pathOption = ''; // Default to an empty string for root
+                        fileManagementSystem.createFile(pathOption, fileName, fileUrl);
+                    });
+                }
+            }
+
+            lastMessageId = messages.last().id;
         }
-    };
+    }
 }
 
-function saveFileSystem() {
-    fs.writeFileSync(dataFilePath, JSON.stringify(fileSystem, null, 2));
-}
+client.once(Events.ClientReady, async () => {
+    console.log(`Ready! Logged in as ${client.user.tag}`);
 
-client.once(Events.ClientReady, readyClient => {
-    console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+    for (const guild of client.guilds.cache.values()) {
+        await initializeFileStructure(guild);
+    }
 });
 
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName } = interaction;
-
-    const command = client.commands.get(commandName);
+    const command = client.commands.get(interaction.commandName);
 
     if (!command) {
         return interaction.reply({ content: 'This command is not available.', ephemeral: true });
     }
 
     try {
-        await command.execute(interaction, fileSystem, saveFileSystem);
+        await command.execute(interaction, fileManagementSystem);
     } catch (error) {
         console.error(error);
         interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
+    }
+});
+
+// Listen for message events to handle file uploads
+client.on(Events.MessageCreate, async message => {
+    if (message.author.bot) return; // Ignore bot messages
+
+    // Check for attachments
+    if (message.attachments.size > 0) {
+        message.attachments.forEach(attachment => {
+            // Process each file attachment
+            const fileName = attachment.name;
+            const fileUrl = attachment.url;
+
+            // Set the path to root
+            const pathOption = ''; // Default to an empty string for root
+            fileManagementSystem.createFile(pathOption, fileName, fileUrl);
+
+            message.reply({ content: `File "${fileName}" has been uploaded and processed.`, ephemeral: true });
+        });
+    }
+});
+
+// Listen for message delete events to handle file deletions
+client.on(Events.MessageDelete, async message => {
+    if (message.attachments.size > 0) {
+        message.attachments.forEach(attachment => {
+            const fileUrl = attachment.url;
+            fileManagementSystem.deleteFileByUrl(fileUrl);
+        });
     }
 });
 

@@ -1,5 +1,3 @@
-import fs from 'fs';
-
 /**
  * A class representing a file system node.
  * Name: Name of the folder (starts with root)
@@ -25,14 +23,31 @@ class FileObject {
 
 export default class FileManagementSystem {
     constructor() {
-        this.root = new Node('');
+        this.root = new Node('root');
     }
 
-    /**
-     * Create a folder in the file system. 
-     * If the folder already exists, do nothing. Default path is root.
-     * @param {string} path - The path to the folder to be created.
-     */
+    validatePath(path) {
+        if (path === '') return true; // Consider the root valid when path is empty
+        const folders = path.split('/');
+        let current = this.root;
+
+        for (let i = 0; i < folders.length; i++) {
+            let found = false;
+            for (const child of current.children) {
+                if (child.name === folders[i]) {
+                    current = child;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     createFolder(path = '') {
         const folders = path.split('/');
         let current = this.root;
@@ -55,6 +70,10 @@ export default class FileManagementSystem {
         }
     }
 
+<<<<<<< HEAD:FileManagementSystem.js
+    createFile(path = '', fileName = '', fileLink = '', permissions = [0]) {
+        if (!fileName) {
+=======
     /**
      * Create a file in the file system. 
      * If the file already exists, do nothing. Default path is root.
@@ -62,7 +81,15 @@ export default class FileManagementSystem {
      */
     createFile(path = '', fileName = '', fileLink = '', permissions = [0], owner = '') {
         if (fileName === '') {
+>>>>>>> f452aec490c08115bec7d076930c4a4151af501c:fileManagementSystem/fileManagementSystem.js
             console.log('Please provide a valid file.');
+            return;
+        }
+
+        if (path === '') {
+            const file = new FileObject(fileName, fileLink);
+            file.permissions = permissions;
+            this.root.files.push(file);
             return;
         }
 
@@ -85,44 +112,55 @@ export default class FileManagementSystem {
             }
         }
 
+<<<<<<< HEAD:FileManagementSystem.js
+        const file = new FileObject(fileName, fileLink);
+        file.permissions = permissions;
+        current.files.push(file);
+=======
         if (!current.files.includes(fileLink)) {
             const file = new FileObject(fileName, fileLink);
             file.permissions = permissions;
             file.owner = owner;
             current.files.push(file);
         }
+>>>>>>> f452aec490c08115bec7d076930c4a4151af501c:fileManagementSystem/fileManagementSystem.js
     }
 
-    /**
-     * Delete a folder in the file system. 
-     * If the folder does not exist, do nothing. Default path is root.
-     * deletes all files in that folder.
-     * @param {string} path - The path to the folder to be deleted.
-     */
     deleteFolder(path = '', permissions = [0]) {
-        if (!permissions.includes(1))
-            return;
         const folders = path.split('/');
         let current = this.root;
+        let parent = null;
+        let folderName = '';
 
         for (let i = 0; i < folders.length; i++) {
             let found = false;
             for (const child of current.children) {
                 if (child.name === folders[i]) {
+                    parent = current;
                     current = child;
+                    folderName = child.name;
                     found = true;
                     break;
                 }
             }
 
             if (!found) {
+                console.log('Folder does not exist.');
                 return;
             }
         }
 
-        current.files = [];
+        if (permissions.includes(1)) {
+            parent.children = parent.children.filter(child => child.name !== folderName);
+        } else {
+            console.log('You do not have permission to delete this folder.');
+        }
     }
 
+<<<<<<< HEAD:FileManagementSystem.js
+    deleteFile(path = '', fileName = '', permissions = [0]) {
+        if (!fileName) {
+=======
     /** 
      * Delete a file in the file system.
      * If the file does not exist or path does not exist
@@ -132,6 +170,7 @@ export default class FileManagementSystem {
      */
     deleteFile(path = '', fileName = '', permissions = [0], requester = '') {
         if (fileName === '') {
+>>>>>>> f452aec490c08115bec7d076930c4a4151af501c:fileManagementSystem/fileManagementSystem.js
             console.log('Please provide a valid file.');
             return false;
         }
@@ -176,14 +215,27 @@ export default class FileManagementSystem {
         current.files = current.files.filter(file => file.name !== fileName);
     }
 
-    /**
-     * replace an existing file with a new file. Default path is root.
-     * @param {string} path - The path to the file to be replaced.
-     * @param {string} oldFile - The file to be replaced.
-     */
-    replaceFile(path = '', oldFileName = '', newFileName = '', newFileLink = '', permissions = [0]) {
+    deleteFileByUrl(fileUrl) {
+        const queue = [this.root];
 
-        if (this.deleteFile(path, oldFile, permissions) === false) {
+        while (queue.length > 0) {
+            const current = queue.shift();
+
+            for (const file of current.files) {
+                if (file.link === fileUrl) {
+                    current.files = current.files.filter(f => f.link !== fileUrl);
+                    return;
+                }
+            }
+
+            for (const child of current.children) {
+                queue.push(child);
+            }
+        }
+    }
+
+    replaceFile(path = '', oldFileName = '', newFileName = '', newFileLink = '', permissions = [0]) {
+        if (this.deleteFile(path, oldFileName, permissions) === false) {
             console.log('File or path does not exist.');
             return;
         }
@@ -191,11 +243,6 @@ export default class FileManagementSystem {
         this.createFile(path, newFileName, newFileLink, permissions);
     }
 
-    /**
-     * Search for a file in the entire file system.
-     * @param {string} file - The file to search for.
-     * @returns {string} - The entire path of the file from the root.
-     */
     searchFile(file = '') {
         const queue = [this.root];
         let result = '';
@@ -221,7 +268,7 @@ export default class FileManagementSystem {
     getPath(node, fileName) {
         let current = node;
         let path = '';
-        while (current.name !== '') {
+        while (current.name !== 'root') {
             path = '/' + current.name + path;
             current = this.getParent(current);
         }
@@ -247,12 +294,6 @@ export default class FileManagementSystem {
         return null;
     }
 
-    /**
-     * Get the directory of a file in the file system.
-     * @param {string} dirName - The name of the directory to search for.
-     * @returns {string} - The entire path of the directory from the root.
-     * If the directory does not exist, return an empty string.
-     */
     getDirectory(dirName = '') {
         const queue = [this.root];
         let result = '';
@@ -273,15 +314,8 @@ export default class FileManagementSystem {
         return result;
     }
 
-    /**
-     * Get the node of a directory in the file system.
-     * @param {string} dirName - The name of the directory to search for.
-     * @returns {Node} - The node of the directory.
-     * If the directory does not exist, return null.
-     */
     getDirectoryNode(dirName = '') {
         const queue = [this.root];
-        let result = '';
 
         while (queue.length > 0) {
             const current = queue.shift();
@@ -298,12 +332,8 @@ export default class FileManagementSystem {
         return null;
     }
 
-    /** Move a file to a new location in the file system.
-     *  If the file does not exist, do nothing. Default path is root.
-     * @param {string} oldPath - The path to the file to be moved.
-     */
     moveFile(oldPath = '', newPath = '', fileName = '', permissions = [0]) {
-        if (fileName === '') {
+        if (!fileName) {
             console.log('Please provide a valid file.');
             return;
         }
@@ -363,41 +393,76 @@ export default class FileManagementSystem {
             }
         }
 
-        const file = current.files.filter(file => file.name === fileName)[0];
+        const file = current.files.find(file => file.name === fileName);
         newCurrent.files.push(file);
         current.files = current.files.filter(file => file.name !== fileName);
     }
 
-    /**
-      * Display the file system in ascii format.
-      * Displays all folder and files currently in the file system.
-      * @param {Node} node - The node to start the display from.
-    */
     displayFileSystem(node = this.root, indent = 0, permissions = [0], single = false) {
         let result = '';
         result += '|' + '-'.repeat(indent) + node.name + '\n';
 
-        // No recursion
         if (single) {
             for (const child of node.children) {
-                result += '|' + '-'.repeat(indent) + child.name + '\n';;
+                result += '|' + '-'.repeat(indent) + child.name + '\n';
             }
             for (const file of node.files) {
                 if (file.permissions.some(permission => permissions.includes(permission))) {
-                    result += '|' + '-'.repeat(indent + 1) + '+' + file.name + '\n';
+                    result += '|' + '-'.repeat(indent + 1) + `[${file.name}](${file.link})` + '\n';
                 }
             }
             return result;
         }
 
-        // recursivley go through the file system
         for (const child of node.children) {
             result += this.displayFileSystem(child, indent + 2, permissions);
         }
 
         for (const file of node.files) {
             if (file.permissions.some(permission => permissions.includes(permission))) {
-                result += '|' + '-'.repeat(indent + 1) + '+' + file.name + '\n';
+                result += '|' + '-'.repeat(indent + 1) + `[${file.name}](${file.link})` + '\n';
+            }
+        }
+
+        return result;
+    }
+
+    displayDirectory(node = this.root, path = '', indent = 0, permissions = [0], full = false) {
+        let result = '';
+        let current = node;
+
+        if (path !== '') {
+            const folders = path.split('/');
+            for (let i = 0; i < folders.length; i++) {
+                let found = false;
+                for (const child of current.children) {
+                    if (child.name === folders[i]) {
+                        current = child;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    return `The path "${path}" does not exist.`;
+                }
+            }
+        }
+
+        result += '|' + '-'.repeat(indent) + current.name + '\n';
+
+        if (full) {
+            for (const child of current.children) {
+                result += this.displayFileSystem(child, indent + 2, permissions, false);
+            }
+        } else {
+            for (const child of current.children) {
+                result += '|' + '-'.repeat(indent + 1) + child.name + '\n';
+            }
+            for (const file of current.files) {
+                if (file.permissions.some(permission => permissions.includes(permission))) {
+                    result += '|' + '-'.repeat(indent + 1) + `[${file.name}](${file.link})` + '\n';
+                }
             }
         }
 
