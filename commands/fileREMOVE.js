@@ -20,7 +20,11 @@ export async function execute(interaction, FileManagementSystem) {
     try {
         pathOption = await validatePath(interaction, FileManagementSystem, pathOption);
 
-        FileManagementSystem.deleteFile(pathOption, fileName);
+        const ownerId = await interaction.guild.members.fetch(interaction.user.id);
+
+        //console.log(ownerId);
+
+        FileManagementSystem.deleteFile(pathOption, fileName, ownerId.user.id, interaction.guild);
         return interaction.reply({ content: `File "${fileName}" deleted successfully from path "${pathOption}".`, ephemeral: true });
     } catch (error) {
         console.error(error);

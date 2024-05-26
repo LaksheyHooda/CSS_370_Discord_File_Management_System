@@ -31,12 +31,33 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-const fileManagementSystem = new FileManagementSystem();
+let map = new Map();
+
+if (!fs.existsSync('file_system_saves')) {
+    fs.mkdirSync('file_system_saves');
+}
+
 async function initializeFileStructure(guild) {
-    const channels = guild.channels.cache.filter(channel => channel.isTextBased());
+    const channels = guild.channels.cache.filter(channel => channel.type === 0);
+    const fileManagementSystem = new FileManagementSystem();
+    map.set(guild.id, fileManagementSystem);
+
+    const saveFilePath = path.join('file_system_saves', `${guild.id}.json`);
+
+    if (fs.existsSync(saveFilePath)) {
+        fileManagementSystem.loadFileSystem(saveFilePath);
+        return;
+    }
 
     for (const [channelId, channel] of channels) {
+
         let lastMessageId;
+
+        if (!fileManagementSystem.getDirectoryNode(channel.name)) {
+            fileManagementSystem.createDirectory('', channel.name);
+            console.log(`Created directory for channel: ${channel.name}`);
+        }
+
         while (true) {
             const options = { limit: 100 };
             if (lastMessageId) {
@@ -52,14 +73,14 @@ async function initializeFileStructure(guild) {
                         const fileName = attachment.name;
                         const fileUrl = attachment.url;
                         const fileType = path.extname(fileName).substring(1) || 'other';
-                        
+                        const filePath = channel.name + '/' + fileType;
+
                         // Check if the directory exists, if not, create it
-                        if (!fileManagementSystem.getDirectoryNode(fileType)) {
-                            fileManagementSystem.createDirectory('', fileType);
+                        if (!fileManagementSystem.getDirectoryNodeByPath(filePath)) {
+                            fileManagementSystem.createDirectory(channel.name, fileType);
                         }
-                        
                         // Insert the file into the appropriate directory
-                        fileManagementSystem.insertFiles(fileType, [{ name: fileName, url: fileUrl, owner: message.author.id }]);
+                        fileManagementSystem.insertFiles(filePath, [{ name: fileName, url: fileUrl, owner: message.author.id }]);
                     });
                 }
             }
@@ -81,6 +102,13 @@ client.once(Events.ClientReady, async () => {
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
+    let fileManagementSystem = map.get(interaction.guild.id);
+
+    if (!fileManagementSystem) {
+        await initializeFileStructure(interaction.guild);
+        fileManagementSystem = map.get(interaction.guild.id);
+    }
+
     const command = client.commands.get(interaction.commandName);
 
     if (!command) {
@@ -89,6 +117,8 @@ client.on(Events.InteractionCreate, async interaction => {
 
     try {
         await command.execute(interaction, fileManagementSystem);
+        const fileSavePath = path.join('file_system_saves', `${interaction.guild.id}.json`);
+        fileManagementSystem.saveFileSystem(fileSavePath);
     } catch (error) {
         console.error(error);
         interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
@@ -97,6 +127,8 @@ client.on(Events.InteractionCreate, async interaction => {
 
 client.on(Events.MessageCreate, async message => {
     if (message.author.bot) return;
+
+    const fileManagementSystem = map.get(message.guild.id);
 
     if (message.attachments.size > 0) {
         message.attachments.forEach(attachment => {
@@ -109,7 +141,7 @@ client.on(Events.MessageCreate, async message => {
                 fileManagementSystem.createDirectory(filePath);
             }
 
-            fileManagementSystem.insertFile(filePath, fileName, fileUrl);
+            fileManagementSystem.insertFiles(filePath, [{ name: fileName, url: fileUrl, owner: message.author.id }]);
 
             message.reply({ content: `File "${fileName}" has been uploaded and processed.`, ephemeral: true });
         });

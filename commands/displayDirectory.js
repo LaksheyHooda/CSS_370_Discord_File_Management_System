@@ -20,8 +20,8 @@ export async function execute(interaction, FileManagementSystem) {
 
     pathOption = await validatePath(interaction, FileManagementSystem, pathOption);
 
-    const tree = FileManagementSystem.displayDirectory(FileManagementSystem.root, pathOption, 0, [0], fullOption);
-    const messages = splitMessage(`\`\`\`\n${tree}\n\`\`\``);
+    const tree = FileManagementSystem.displayDirectory(FileManagementSystem.root, pathOption, 0, [0], !fullOption);
+    const messages = splitMessage(`${tree}`);
 
     await interaction.reply({ content: messages[0], ephemeral: true });
 

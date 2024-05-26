@@ -1,4 +1,6 @@
 import { searchForFileInServer } from './searchForFileInServer.js';
+import fs from 'fs';
+
 
 class Node {
     constructor(name) {
@@ -14,8 +16,8 @@ class FileObject {
         this.type = 'file';
         this.name = name;
         this.link = link;
-        this.permissions = [];
-        this.owner = '';
+        this.permissions = permission;
+        this.owner = owner;
     }
 }
 
@@ -24,23 +26,25 @@ export default class FileManagementSystem {
         this.root = new Node('');
     }
 
-// DISPLAYING METHODS
-//=====================================================================================
+    // DISPLAYING METHODS
+    //=====================================================================================
     displayFileSystem(node = this.root, indent = 0, permissions = [0], single = false) {
         let result = '';
-        result += '|' + '-'.repeat(indent) + node.name + '\n';
+        result += '|' + '='.repeat(indent) + '/' + node.name + '\n';
 
         if (single) {
             for (const child of node.children) {
-                result += '|' + '-'.repeat(indent) + child.name + '\n';
+                result += '|' + '='.repeat(indent) + child.name + '\n';
             }
             for (const file of node.files) {
                 if (file.permissions.some(permission => permissions.includes(permission))) {
-                    result += '|' + '-'.repeat(indent + 1) + `[${file.name}](${file.link})` + '\n';
+                    result += '|' + '-'.repeat(indent + 2) + `[${file.name}](<${file.link}>)` + '\n';
                 }
             }
             return result;
         }
+
+        // console.log(node)
 
         for (const child of node.children) {
             result += this.displayFileSystem(child, indent + 2, permissions);
@@ -48,7 +52,7 @@ export default class FileManagementSystem {
 
         for (const file of node.files) {
             if (file.permissions.some(permission => permissions.includes(permission))) {
-                result += '|' + '-'.repeat(indent + 1) + `[${file.name}](${file.link})` + '\n';
+                result += '|' + '-'.repeat(indent + 2) + `[${file.name}](<${file.link}>)` + '\n';
             }
         }
 
@@ -56,7 +60,6 @@ export default class FileManagementSystem {
     }
 
     displayDirectory(node = this.root, path = '', indent = 0, permissions = [0], full = false) {
-        let result = '';
         let current = node;
 
         if (path !== '') {
@@ -77,35 +80,18 @@ export default class FileManagementSystem {
             }
         }
 
-        result += '|' + '-'.repeat(indent) + current.name + '\n';
-
-        if (full) {
-            for (const child of current.children) {
-                result += this.displayFileSystem(child, indent + 2, permissions, false);
-            }
-        } else {
-            for (const child of current.children) {
-                result += '|' + '-'.repeat(indent + 1) + child.name + '\n';
-            }
-            for (const file of current.files) {
-                if (file.permissions.some(permission => permissions.includes(permission))) {
-                    result += '|' + '-'.repeat(indent + 1) + `[${file.name}](${file.link})` + '\n';
-                }
-            }
-        }
-
-        return result;
+        return this.displayFileSystem(current, indent, permissions, full);
     }
-//=====================================================================================
-//
+    //=====================================================================================
+    //
 
 
-// CREATING METHODS
-//=====================================================================================
+    // CREATING METHODS
+    //=====================================================================================
     createDirectory(path = '', dirName) {
         const paths = path ? path.split('/').filter(Boolean) : [];
         let current = this.root;
-    
+
         // Traverse the given path
         for (const p of paths) {
             let found = false;
@@ -117,43 +103,53 @@ export default class FileManagementSystem {
                 }
             }
             if (!found) {
-                throw new Error(`Path "${path}" does not exist.`);
+                throw new Error(`Path for dir "${path}" does not exist.`);
             }
         }
-    
+
         // Check if the directory already exists in the current path
         for (const child of current.children) {
             if (child.name === dirName && child.type === 'folder') {
                 throw new Error(`Directory "${dirName}" already exists in path "${path}".`);
             }
         }
-    
+
         // Create the new directory
         const newDirectory = new Node(dirName);
         current.children.push(newDirectory);
     }
-    
+
     insertFiles(path = '', files) {
         const paths = path.split('/').filter(Boolean);
         let current = this.root;
 
+        //console.log(path);
+
         for (const p of paths) {
-            if (!current[p]) {
-                current[p] = { type: 'folder', children: {} };
+            let found = false;
+            for (const child of current.children) {
+                if (child.name === p && child.type === 'folder') {
+                    current = child;
+                    found = true;
+                    break;
+                }
             }
-            current = current[p].children;
+            if (!found) {
+                console.log('Path does not exist.');
+            }
         }
 
         files.forEach(file => {
-            current[file.name] = { type: 'file', url: file.url };
+            let fileobj = new FileObject(file.name, file.url, [0], file.owner);
+            current.files.push(fileobj);
         });
     }
-//=====================================================================================
+    //=====================================================================================
 
 
 
-// UPDATING METHODS
-//=====================================================================================
+    // UPDATING METHODS
+    //=====================================================================================
     moveDirectory(oldPath, newPath) {
         const node = this.getDirectoryNode(oldPath);
         if (!node) {
@@ -170,7 +166,7 @@ export default class FileManagementSystem {
         const newParent = this.getDirectoryNode(newPath) || this.root;
         newParent.children.push(node);
     }
-    
+
     moveFile(oldPath = '', newPath = '', fileName = '', permissions = [0]) {
         if (!fileName) {
             console.log('Please provide a valid file.');
@@ -236,7 +232,7 @@ export default class FileManagementSystem {
         newCurrent.files.push(file);
         current.files = current.files.filter(file => file.name !== fileName);
     }
-    
+
     renameDirectory(path, newName) {
         const node = this.getDirectoryNode(path);
         if (!node) {
@@ -256,12 +252,12 @@ export default class FileManagementSystem {
 
         this.createFile(path, newFileName, newFileLink, permissions);
     }
-//=====================================================================================
+    //=====================================================================================
 
 
 
-// DELETING METHODS
-//=====================================================================================
+    // DELETING METHODS
+    //=====================================================================================
     async deleteDirectory(path, guild) {
         if (path === '') {
             throw new Error('Cannot delete the root directory.');
@@ -289,7 +285,7 @@ export default class FileManagementSystem {
         }
         folder.children = [];
     }
-    
+
     async deleteFileAsAdmin(path, fileName, guild) {
         if (!fileName) {
             console.log('Please provide a valid file.');
@@ -357,7 +353,8 @@ export default class FileManagementSystem {
 
         let fileExists = false;
         for (const file of current.files) {
-            if (file.name === fileName && file.owner === owner) {
+            if (file.name == fileName && file.owner == owner) {
+                console.log('File exists')
                 fileExists = true;
                 break;
             }
@@ -394,12 +391,12 @@ export default class FileManagementSystem {
             }
         }
     }
-//=====================================================================================
+    //=====================================================================================
 
 
 
-// SEARCH METHODS
-//=====================================================================================
+    // SEARCH METHODS
+    //=====================================================================================
     getDirectory(dirName = '') {
         const queue = [this.root];
         let result = '';
@@ -436,6 +433,28 @@ export default class FileManagementSystem {
         }
 
         return null;
+    }
+
+    getDirectoryNodeByPath(path = '') {
+        const folders = path.split('/').filter(Boolean);
+        let current = this.root;
+
+        for (const folder of folders) {
+            let found = false;
+            for (const child of current.children) {
+                if (child.name === folder) {
+                    current = child;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                return null;
+            }
+        }
+
+        return current;
     }
 
     getPath(node, fileName) {
@@ -488,12 +507,12 @@ export default class FileManagementSystem {
 
         return result;
     }
-//=====================================================================================
+    //=====================================================================================
 
 
 
-// CHECKING METHODS
-//=====================================================================================
+    // CHECKING METHODS
+    //=====================================================================================
     isOwner(path, fileName, owner) {
         const folders = path.split('/');
         let current = this.root;
@@ -521,7 +540,7 @@ export default class FileManagementSystem {
 
         return false;
     }
-    
+
     ValidatePath(path) {
         if (path === '') return true; // Consider the root valid when path is empty
         const folders = path.split('/');
@@ -543,6 +562,73 @@ export default class FileManagementSystem {
         }
         return true;
     }
-//=====================================================================================
+    //=====================================================================================
 
+
+    // SAVING TO DISK METHODS
+    //=====================================================================================
+
+    serializeFileSystem(node) {
+        return {
+            type: node.type,
+            name: node.name,
+            files: node.files.map(file => ({
+                type: file.type,
+                name: file.name,
+                link: file.link,
+                permissions: file.permissions,
+                owner: file.owner
+            })),
+            children: node.children.map(child => this.serializeFileSystem(child))
+        };
+    }
+
+    deserializeFileSystem(nodeData, parent = null) {
+        let newNode;
+        if (nodeData.type === 'folder') {
+            newNode = new Node(nodeData.name);
+            newNode.children = nodeData.children.map(childData => this.deserializeFileSystem(childData, newNode));
+            newNode.files = nodeData.files.map(fileData => {
+                let fileObj = new FileObject(fileData.name, fileData.link, [0], fileData.owner);
+                return fileObj;
+            });
+        } else {
+            newNode = new FileObject(nodeData.name, nodeData.link, [0], nodeData.owner);
+        }
+
+        if (parent) {
+            parent.children.push(newNode);
+        }
+
+        return newNode;
+    }
+
+    saveFileSystem(savePath) {
+        if (!savePath || savePath === '') {
+            console.log('Please provide a valid save path.');
+            return;
+        }
+
+        const fileSystemData = this.serializeFileSystem(this.root);
+        const fileSystemJson = JSON.stringify(fileSystemData, null, 2); // Pretty print the JSON
+
+        try {
+            fs.writeFileSync(savePath, fileSystemJson, 'utf-8');
+            console.log('File system saved successfully to', savePath);
+        } catch (error) {
+            console.error('Failed to save file system:', error);
+        }
+    }
+
+    loadFileSystem(loadPath) {
+        try {
+            const data = fs.readFileSync(loadPath, 'utf-8');
+            const parsedData = JSON.parse(data);
+
+            this.root = this.deserializeFileSystem(parsedData);
+            console.log('File system loaded successfully from', loadPath);
+        } catch (error) {
+            console.error('Failed to load file system:', error);
+        }
+    }
 }
