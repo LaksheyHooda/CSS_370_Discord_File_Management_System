@@ -1,9 +1,8 @@
-import { MessageCollector } from 'discord.js';
 
 export async function validatePath(interaction, FileManagementSystem, pathOption) {
     const filter = response => response.author.id === interaction.user.id;
 
-    while (!FileManagementSystem.validatePath(pathOption)) {
+    while (!FileManagementSystem.ValidatePath(pathOption)) {
         await interaction.followUp({ content: `The path "${pathOption}" does not exist. Please provide a valid path.`, ephemeral: true });
 
         const collected = await interaction.channel.awaitMessages({

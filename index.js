@@ -1,16 +1,13 @@
+import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
+
+import { fileURLToPath, pathToFileURL } from 'url';
+import path from 'path';
+
+import FileManagementSystem from './utils/FileManagementSystem.js';
+import fs from 'fs';
+
 import dotenv from 'dotenv';
 dotenv.config();
-
-import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
-import FileManagementSystem from './FileManagementSystem.js';
-import { searchForFileInServer } from './utils/searchForFileInServer.js'; // Import the utility function
-
-// ES module equivalents of __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const client = new Client({
     intents: [
@@ -23,11 +20,11 @@ const client = new Client({
     partials: ['MESSAGE', 'CHANNEL', 'REACTION'],
 });
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 client.commands = new Collection();
-
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     const command = await import(pathToFileURL(filePath).href);
@@ -35,7 +32,6 @@ for (const file of commandFiles) {
 }
 
 const fileManagementSystem = new FileManagementSystem();
-
 async function initializeFileStructure(guild) {
     const channels = guild.channels.cache.filter(channel => channel.isTextBased());
 
@@ -48,23 +44,27 @@ async function initializeFileStructure(guild) {
             }
 
             const messages = await channel.messages.fetch(options);
-            if (messages.size === 0) {
-                break;
-            }
+            if (messages.size === 0) break;
 
             for (const message of messages.values()) {
                 if (message.attachments.size > 0) {
                     message.attachments.forEach(attachment => {
                         const fileName = attachment.name;
                         const fileUrl = attachment.url;
-                        const pathOption = ''; // Default to an empty string for root
-                        fileManagementSystem.createFile(pathOption, fileName, fileUrl);
+                        const fileType = path.extname(fileName).substring(1) || 'other';
+                        
+                        // Check if the directory exists, if not, create it
+                        if (!fileManagementSystem.getDirectoryNode(fileType)) {
+                            fileManagementSystem.createDirectory('', fileType);
+                        }
+                        
+                        // Insert the file into the appropriate directory
+                        fileManagementSystem.insertFiles(fileType, [{ name: fileName, url: fileUrl, owner: message.author.id }]);
                     });
                 }
             }
 
             lastMessageId = messages.last().id;
-            // Delay to avoid hitting rate limits
             await new Promise(resolve => setTimeout(resolve, 1200));
         }
     }
@@ -95,20 +95,21 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-// Listen for message events to handle file uploads
 client.on(Events.MessageCreate, async message => {
-    if (message.author.bot) return; // Ignore bot messages
+    if (message.author.bot) return;
 
-    // Check for attachments
     if (message.attachments.size > 0) {
         message.attachments.forEach(attachment => {
-            // Process each file attachment
             const fileName = attachment.name;
             const fileUrl = attachment.url;
+            const fileType = path.extname(fileName).substring(1);
+            const filePath = fileType ? `${fileType}` : `other`;
 
-            // Set the path to root
-            const pathOption = ''; // Default to an empty string for root
-            fileManagementSystem.createFile(pathOption, fileName, fileUrl);
+            if (!fileManagementSystem.createDirectory(filePath)) {
+                fileManagementSystem.createDirectory(filePath);
+            }
+
+            fileManagementSystem.insertFile(filePath, fileName, fileUrl);
 
             message.reply({ content: `File "${fileName}" has been uploaded and processed.`, ephemeral: true });
         });

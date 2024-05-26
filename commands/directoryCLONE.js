@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 
 export const data = new SlashCommandBuilder()
-    .setName('duplicatefolder')
+    .setName('clonedirectory')
     .setDescription('Duplicate a folder to the same or a different location')
     .addStringOption(option =>
         option.setName('sourcepath')
