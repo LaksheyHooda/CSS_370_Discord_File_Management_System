@@ -44,11 +44,47 @@ async function initializeFileStructure(guild) {
 
     const saveFilePath = path.join('file_system_saves', `${guild.id}.json`);
 
+    // Create guild roles if they don't exist
+    // console.log(guild.roles.cache)
+
+    if (!guild.roles.cache.find(role => role.name === 'Admin')) {
+        console.log('Creating admin role');
+        guild.roles.create({ name: 'Admin', permissions: [], color: '#FF0000' });
+    }
+
+    if (!guild.roles.cache.find(role => role.name === 'Moderator')) {
+        guild.roles.create({ name: 'Moderator', permissions: [], color: '#0000FF' });
+
+    }
+
+    if (!guild.roles.cache.find(role => role.name === 'User')) {
+        let role = await guild.roles.create({ name: 'User', permissions: [], color: '#000000' });
+        guild.members.fetch().then(members => {
+            members.forEach(member => {
+                if (!member.roles.cache.has(role.id)) {
+                    member.roles.add(role).catch(console.error);
+                }
+            });
+        }).catch(console.error);
+    } else {
+        let role = guild.roles.cache.find(role => role.name === 'User');
+        guild.members.fetch().then(members => {
+            members.forEach(member => {
+                if (!member.roles.cache.has(role.id)) {
+                    member.roles.add(role).catch(console.error);
+                }
+            });
+        }).catch(console.error);
+    }
+
+    // check if filesavepath exists, if it does, load the file system from the save file
     if (fs.existsSync(saveFilePath)) {
         fileManagementSystem.loadFileSystem(saveFilePath);
         return;
     }
 
+
+    // Create the file system structure from the discord channels and messages
     for (const [channelId, channel] of channels) {
 
         let lastMessageId;
@@ -118,7 +154,7 @@ client.on(Events.InteractionCreate, async interaction => {
     try {
         await command.execute(interaction, fileManagementSystem);
         const fileSavePath = path.join('file_system_saves', `${interaction.guild.id}.json`);
-        fileManagementSystem.saveFileSystem(fileSavePath);
+        //fileManagementSystem.saveFileSystem(fileSavePath);
     } catch (error) {
         console.error(error);
         interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
@@ -150,7 +186,8 @@ client.on(Events.MessageCreate, async message => {
 
 // Listen for message delete events to handle file deletions
 client.on(Events.MessageDelete, async message => {
-    if (message.attachments.size > 0) {
+    const fileManagementSystem = map.get(message.guild.id);
+    if (message.attachments.size > 0 && fileManagementSystem) {
         message.attachments.forEach(attachment => {
             const fileUrl = attachment.url;
             fileManagementSystem.deleteFileByUrl(fileUrl);
