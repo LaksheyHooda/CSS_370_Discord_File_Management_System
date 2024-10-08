@@ -154,7 +154,7 @@ client.on(Events.InteractionCreate, async interaction => {
     try {
         await command.execute(interaction, fileManagementSystem);
         const fileSavePath = path.join('file_system_saves', `${interaction.guild.id}.json`);
-        //fileManagementSystem.saveFileSystem(fileSavePath);
+        fileManagementSystem.saveFileSystem(fileSavePath);
     } catch (error) {
         console.error(error);
         interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
